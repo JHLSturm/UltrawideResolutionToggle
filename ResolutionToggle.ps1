@@ -878,6 +878,47 @@ function Assert-DisplayConfigResolutionValid($ActiveMonitor, [string]$DevicePath
     }
 }
 
+function Test-DisplayModeListed($ActiveMonitor, [int]$Width, [int]$Height) {
+    return [DisplayConfigNative]::Supports($ActiveMonitor.GdiName, $Width, $Height)
+}
+
+function Get-ModeSummary($ActiveMonitor, [int]$MaxCount = 20) {
+    $modes = @([DisplayConfigNative]::GetModes($ActiveMonitor.GdiName) |
+        Sort-Object Width, Height, Frequency -Unique)
+
+    $modes = @($modes |
+        Sort-Object @{ Expression = { $_.Width * $_.Height }; Descending = $true },
+                    @{ Expression = { $_.Width }; Descending = $true },
+                    @{ Expression = { $_.Height }; Descending = $true },
+                    @{ Expression = { $_.Frequency }; Descending = $true })
+
+    if ($modes.Count -eq 0) {
+        return 'Keine Modi gemeldet.'
+    }
+
+    $items = @($modes | Select-Object -First $MaxCount | ForEach-Object {
+        '{0} x {1} @ {2} Hz' -f $_.Width, $_.Height, $_.Frequency
+    })
+
+    if ($modes.Count -gt $MaxCount) {
+        $items += ('... plus {0} weitere' -f ($modes.Count - $MaxCount))
+    }
+
+    return ($items -join '; ')
+}
+
+function Show-UnsupportedReducedModeMessage($ActiveMonitor, [int]$Width, [int]$Height, [int]$ExitCode) {
+    $modeHint = if (Test-DisplayModeListed $ActiveMonitor $Width $Height) {
+        "Windows meldet diesen Modus zwar in der klassischen Modusliste, DisplayConfig akzeptiert ihn aber nicht exakt."
+    }
+    else {
+        "Windows meldet diesen Modus fuer diesen Monitor nicht als auswaehlbaren Modus."
+    }
+
+    Show-Info "Dieser Monitor bietet $Width x $Height nicht als exakt nutzbaren Modus an.`n`nMonitor: $($ActiveMonitor.FriendlyName) [$($ActiveMonitor.GdiName)]`n`n$modeHint`n`nDer Monitor bleibt nativ. Es wurde nichts veraendert."
+    exit $ExitCode
+}
+
 function Register-MonitorUnderCursor {
     param(
         [bool]$FromToggle = $false
@@ -904,7 +945,13 @@ function Register-MonitorUnderCursor {
     }
 
     Assert-DisplayConfigResolutionValid $active $active.DevicePath $native.Width $native.Height $false
-    Assert-DisplayConfigResolutionValid $active $active.DevicePath $reducedWidth $reducedHeight $true
+
+    try {
+        Assert-DisplayConfigResolutionValid $active $active.DevicePath $reducedWidth $reducedHeight $true
+    }
+    catch {
+        Show-UnsupportedReducedModeMessage $active $reducedWidth $reducedHeight 42
+    }
 
     $config = Read-Config
     $id = Get-StableMonitorId $active.DevicePath
@@ -991,7 +1038,16 @@ function Invoke-ResolutionChange($Pair, [int]$Width, [int]$Height, [bool]$Center
     $active = $Pair.Active
     $registered = $Pair.Config
 
-    Assert-DisplayConfigResolutionValid $active $registered.DevicePath $Width $Height $Center
+    try {
+        Assert-DisplayConfigResolutionValid $active $registered.DevicePath $Width $Height $Center
+    }
+    catch {
+        if ($Center) {
+            Show-UnsupportedReducedModeMessage $active $Width $Height 33
+        }
+
+        throw
+    }
 
     $rc = [DisplayConfigNative]::SetCcdResolution(
         $active.GdiName,
@@ -1241,6 +1297,7 @@ function Write-Diagnosis {
         $lines.Add(('Aktuelle Target-Aufloesung: {0} x {1}' -f $m.TargetWidth, $m.TargetHeight))
         $lines.Add(('Scaling-Modus: {0} ({1})' -f $m.Scaling, (Get-ScalingName $m.Scaling)))
         $lines.Add(('Registriert: ' + $registeredText))
+        $lines.Add(('Verfuegbare Modi: ' + (Get-ModeSummary $m 30)))
 
         if ($null -ne $registeredConfig) {
             $lines.Add(('Erkannte native Aufloesung: {0} x {1}' -f $registeredConfig.NativeWidth, $registeredConfig.NativeHeight))
