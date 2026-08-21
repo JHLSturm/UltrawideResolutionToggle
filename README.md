@@ -1,102 +1,102 @@
 Ultrawide Resolution Toggle
 ===========================
 
-Dieses Tool schaltet ausdruecklich registrierte Ultrawide-Monitore zwischen ihrer nativen Aufloesung und einer zentrierten 2560 x 1440-Darstellung um.
+This tool toggles explicitly registered ultrawide monitors between their native resolution and a centered 2560 x 1440 mode.
 
-Der technische Ansatz aus Version 4.1 bleibt erhalten: Die Windows Display Configuration API setzt nur die Source-/Desktop-Aufloesung um. Das physische Target bleibt auf der nativen Monitoraufloesung, und fuer den reduzierten Modus wird DISPLAYCONFIG_SCALING_CENTERED verwendet.
+The technical approach from version 4.1 is preserved: the Windows Display Configuration API changes only the source/desktop resolution. The physical target remains at the monitor's native resolution, and the reduced mode uses DISPLAYCONFIG_SCALING_CENTERED.
 
 Installation
 ------------
 
-1. Install.cmd starten.
-2. Den Mauszeiger auf den Ultrawide-Monitor bewegen, der registriert werden soll.
-3. Die Registrierung waehrend der Installation bestaetigen.
-4. Den Startmenue-Eintrag "Ultrawide-Aufloesung umschalten" bei Bedarf an die Taskleiste anheften.
+1. Run Install.cmd.
+2. Move the mouse pointer onto the ultrawide monitor you want to register.
+3. Confirm the registration during installation.
+4. Pin the Start menu entry "Ultrawide-Aufloesung umschalten" to the taskbar if desired.
 
-Windows kann automatisches Anheften an die Taskleiste blockieren. Der Startmenue-Eintrag bleibt dann als normaler Fallback verfuegbar.
+Windows may block automatic taskbar pinning. In that case, the Start menu entry remains available as the normal fallback.
 
-Bedienung
----------
+Usage
+-----
 
-Es gibt nur einen Umschaltbutton: "Ultrawide-Aufloesung umschalten".
+There is only one toggle button: "Ultrawide-Aufloesung umschalten".
 
-Noch kein Monitor registriert:
-  Der Toggle registriert den Monitor unter dem Mauszeiger, sofern er als passender 1440p-Ultrawide erkannt wird. Die Aufloesung wird bei diesem ersten Klick noch nicht veraendert.
+No monitor registered yet:
+  The toggle registers the monitor under the mouse pointer if it is detected as a matching 1440p ultrawide. The resolution is not changed on this first click.
 
-Kein registrierter Ultrawide aktiv:
-  Es wird nichts veraendert.
+No registered ultrawide active:
+  Nothing is changed.
 
-Genau ein registrierter Ultrawide aktiv:
-  Genau dieser Monitor wird umgeschaltet, unabhaengig von der Mausposition.
+Exactly one registered ultrawide active:
+  That monitor is toggled, regardless of the mouse position.
 
-Mehrere registrierte Ultrawides aktiv:
-  Der Monitor unter dem Mauszeiger entscheidet. Befindet sich der Mauszeiger auf einem nicht registrierten Display, wird nichts veraendert.
+Multiple registered ultrawides active:
+  The monitor under the mouse pointer decides. If the mouse pointer is on an unregistered display, nothing is changed.
 
-Monitor registrieren
---------------------
+Registering a Monitor
+---------------------
 
-Wenn noch kein Monitor registriert ist, reicht der normale Toggle-Klick: Mauszeiger auf den gewuenschten Ultrawide bewegen und "Ultrawide-Aufloesung umschalten" starten. Dieser erste Klick registriert nur.
+If no monitor has been registered yet, the regular toggle click is enough: move the mouse pointer onto the desired ultrawide and start "Ultrawide-Aufloesung umschalten". This first click only registers the monitor.
 
-Weitere Monitore koennen ueber Register-Monitor.cmd registriert werden, waehrend sich der Mauszeiger auf dem gewuenschten Ultrawide befindet.
+Additional monitors can be registered with Register-Monitor.cmd while the mouse pointer is on the desired ultrawide.
 
-Standardprofil fuer 1440p-Ultrawides:
-  native Breite groesser als 2560
-  native Hoehe 1440
-  reduzierter Modus 2560 x 1440
-  Scaling centered
+Default profile for 1440p ultrawides:
+  native width greater than 2560
+  native height 1440
+  reduced mode 2560 x 1440
+  scaling centered
 
-Beispiele:
+Examples:
   5120 x 1440 <-> 2560 x 1440
   3440 x 1440 <-> 2560 x 1440
 
-Bereits registrierte Monitore werden anhand ihres DisplayConfig DevicePath erkannt und aktualisiert, nicht doppelt angelegt.
+Already registered monitors are recognized and updated by their DisplayConfig DevicePath instead of being added twice.
 
-Monitore verwalten
-------------------
+Managing Monitors
+-----------------
 
-Manage-Monitors.cmd startet eine einfache Konsolenverwaltung.
+Manage-Monitors.cmd starts a simple console management tool.
 
-Moeglich ist:
-  registrierte Monitore auflisten
-  einen Monitor entfernen
-  Konfiguration vollstaendig zuruecksetzen
+Available actions:
+  list registered monitors
+  remove a monitor
+  reset the full configuration
 
-Diagnose
---------
+Diagnostics
+-----------
 
-Diagnose.cmd erstellt auf dem Desktop:
+Diagnose.cmd creates the following file on the desktop:
 
   UltrawideResolutionToggle-Diagnose.txt
 
-Die Diagnose veraendert keine Anzeigeeinstellungen. Sie enthaelt PowerShell-Version, aktive Displays, Friendly Name, GDI Name, DevicePath, EDID-Daten, Connector, Source-/Target-Aufloesung, Scaling, Registrierungsstatus, Mausposition und die gespeicherte Konfiguration.
+Diagnostics do not change any display settings. The report includes the PowerShell version, active displays, friendly name, GDI name, DevicePath, EDID data, connector, source/target resolution, scaling, registration status, mouse position, and the saved configuration.
 
-Monitoridentifikation
----------------------
+Monitor Identification
+----------------------
 
-Registriert wird nicht DISPLAY1, nicht der primaere Monitor und nicht irgendein 1440p-Display. Gespeichert wird der konkrete DisplayConfig DevicePath des Zielmonitors plus hilfreiche Metadaten wie Friendly Name, EDID Manufacturer/Product, Connector, OutputTechnology und die native sowie reduzierte Aufloesung.
+The tool does not register DISPLAY1, the primary monitor, or just any 1440p display. It stores the concrete DisplayConfig DevicePath of the target monitor plus helpful metadata such as friendly name, EDID manufacturer/product, connector, OutputTechnology, and the native and reduced resolutions.
 
-Beim Umschalten wird zuerst die Liste aktiver DisplayConfig-Pfade abgefragt. Nur wenn ein gespeicherter DevicePath aktuell aktiv und eindeutig vorhanden ist, darf dieser Monitor veraendert werden.
+When toggling, the script first queries the list of active DisplayConfig paths. A monitor may only be changed if a saved DevicePath is currently active and uniquely present.
 
-Mehrmonitorfall
----------------
+Multi-Monitor Case
+------------------
 
-Sind mehrere registrierte Ultrawides gleichzeitig aktiv, fragt das Skript die aktuelle Mausposition per GetCursorPos ab. MonitorFromPoint und GetMonitorInfo liefern daraus den GDI-Namen, zum Beispiel \\.\DISPLAY2. Dieser GDI-Name wird gegen die aktiven DisplayConfig-Pfade aufgeloest. Nur wenn der dadurch gefundene DisplayConfig DevicePath registriert ist, wird genau dieser Monitor umgeschaltet.
+If multiple registered ultrawides are active at the same time, the script queries the current mouse position with GetCursorPos. MonitorFromPoint and GetMonitorInfo return the GDI name, for example \\.\DISPLAY2. This GDI name is resolved against the active DisplayConfig paths. Only if the resulting DisplayConfig DevicePath is registered will exactly that monitor be toggled.
 
-Sicherheit
-----------
+Safety
+------
 
-Bei Mehrdeutigkeit, fehlendem Monitor, nicht registriertem Bildschirm oder unerwarteter aktueller Aufloesung wird nichts veraendert.
+If the situation is ambiguous, the monitor is missing, the display is not registered, or the current resolution is unexpected, nothing is changed.
 
-Vor dem Anwenden prueft das Skript:
-  Zielmonitor ist aktiv
-  DevicePath stimmt exakt mit der Registrierung ueberein
-  Zielaufloesung wird von Windows als Source-Modus gemeldet
-  DisplayConfig-Struktur-Layouts haben die erwarteten Groessen
-  SetDisplayConfig akzeptiert die neue Konfiguration zuerst mit SDC_VALIDATE
+Before applying a change, the script verifies that:
+  the target monitor is active
+  the DevicePath exactly matches the registration
+  the target resolution is reported by Windows as a source mode
+  DisplayConfig structure layouts have the expected sizes
+  SetDisplayConfig accepts the new configuration first with SDC_VALIDATE
 
-Deinstallation
+Uninstallation
 --------------
 
-Uninstall.cmd oder der Startmenue-Eintrag "Ultrawide-Aufloesung deinstallieren" entfernt Startmenue-/Taskleistenverknuepfungen, installierte Dateien und gespeicherte Konfiguration.
+Uninstall.cmd or the Start menu entry "Ultrawide-Aufloesung deinstallieren" removes Start menu/taskbar shortcuts, installed files, and the saved configuration.
 
-Auf Wunsch werden vorher nur aktive registrierte Monitore auf ihre jeweilige native Aufloesung zurueckgeschaltet. Nicht registrierte Displays werden dabei nicht veraendert.
+If requested, only active registered monitors are switched back to their respective native resolution first. Unregistered displays are not changed.
