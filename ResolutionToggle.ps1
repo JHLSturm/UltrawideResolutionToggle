@@ -693,8 +693,7 @@ public static class DisplayConfigNative
 
             uint validateFlags =
                 SDC_USE_SUPPLIED_DISPLAY_CONFIG |
-                SDC_VALIDATE |
-                SDC_ALLOW_CHANGES;
+                SDC_VALIDATE;
 
             rc = SetDisplayConfig(
                 pathCount,
@@ -712,8 +711,7 @@ public static class DisplayConfigNative
             uint applyFlags =
                 SDC_USE_SUPPLIED_DISPLAY_CONFIG |
                 SDC_APPLY |
-                SDC_SAVE_TO_DATABASE |
-                SDC_ALLOW_CHANGES;
+                SDC_SAVE_TO_DATABASE;
 
             return SetDisplayConfig(
                 pathCount,
@@ -1006,6 +1004,22 @@ function Invoke-ResolutionChange($Pair, [int]$Width, [int]$Height, [bool]$Center
     if ($rc -ne 0) {
         Show-ErrorMessage "Windows DisplayConfig hat den Wechsel auf $Width x $Height abgelehnt.`n`nFehlercode: $rc`n`nEs wurde kein anderer Monitor veraendert."
         exit 30
+    }
+
+    Start-Sleep -Milliseconds 700
+
+    $after = @([DisplayConfigNative]::GetActiveMonitors() | Where-Object {
+        [string]::Equals($_.DevicePath, $registered.DevicePath, [System.StringComparison]::OrdinalIgnoreCase)
+    })
+
+    if ($after.Count -ne 1) {
+        Show-ErrorMessage "Der Zielmonitor konnte nach dem Wechsel nicht mehr eindeutig gefunden werden.`n`nAngefordert war $Width x $Height. Bitte Diagnose.cmd ausfuehren."
+        exit 31
+    }
+
+    if ($after[0].Width -ne $Width -or $after[0].Height -ne $Height) {
+        Show-ErrorMessage "Windows hat nicht die angeforderte Aufloesung gesetzt.`n`nAngefordert: $Width x $Height`nTatsaechlich: $($after[0].Width) x $($after[0].Height)`n`nBitte Diagnose.cmd ausfuehren. Es wurde kein weiterer Monitor veraendert."
+        exit 32
     }
 }
 
