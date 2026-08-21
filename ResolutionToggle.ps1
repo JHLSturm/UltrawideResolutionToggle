@@ -567,12 +567,33 @@ public static class DisplayConfigNative
         return false;
     }
 
+    public static int ValidateCcdResolution(
+        string gdiName,
+        string expectedDevicePath,
+        int width,
+        int height,
+        bool center)
+    {
+        return ChangeCcdResolution(gdiName, expectedDevicePath, width, height, center, false);
+    }
+
     public static int SetCcdResolution(
         string gdiName,
         string expectedDevicePath,
         int width,
         int height,
         bool center)
+    {
+        return ChangeCcdResolution(gdiName, expectedDevicePath, width, height, center, true);
+    }
+
+    static int ChangeCcdResolution(
+        string gdiName,
+        string expectedDevicePath,
+        int width,
+        int height,
+        bool center,
+        bool apply)
     {
         for (int attempt = 0; attempt < 4; attempt++) {
             uint pathCount;
@@ -674,6 +695,9 @@ public static class DisplayConfigNative
 
             if (rc != ERROR_SUCCESS)
                 return rc;
+
+            if (!apply)
+                return ERROR_SUCCESS;
 
             uint applyFlags =
                 SDC_USE_SUPPLIED_DISPLAY_CONFIG |
@@ -825,6 +849,27 @@ function Assert-ModeSupported($ActiveMonitor, [int]$Width, [int]$Height) {
     }
 }
 
+function Assert-DisplayConfigResolutionValid($ActiveMonitor, [string]$DevicePath, [int]$Width, [int]$Height, [bool]$Center) {
+    $rc = [DisplayConfigNative]::ValidateCcdResolution(
+        $ActiveMonitor.GdiName,
+        $DevicePath,
+        $Width,
+        $Height,
+        $Center
+    )
+
+    if ($rc -ne 0) {
+        $modeListHint = if ([DisplayConfigNative]::Supports($ActiveMonitor.GdiName, $Width, $Height)) {
+            'Der Modus wird von EnumDisplaySettings gemeldet.'
+        }
+        else {
+            'Der Modus wird von EnumDisplaySettings nicht gemeldet.'
+        }
+
+        throw "$($ActiveMonitor.FriendlyName) [$($ActiveMonitor.GdiName)] hat die DisplayConfig-Validierung fuer $Width x $Height abgelehnt. Fehlercode: $rc. $modeListHint"
+    }
+}
+
 function Register-MonitorUnderCursor {
     param(
         [bool]$FromToggle = $false
@@ -850,8 +895,8 @@ function Register-MonitorUnderCursor {
         exit 41
     }
 
-    Assert-ModeSupported $active $native.Width $native.Height
-    Assert-ModeSupported $active $reducedWidth $reducedHeight
+    Assert-DisplayConfigResolutionValid $active $active.DevicePath $native.Width $native.Height $false
+    Assert-DisplayConfigResolutionValid $active $active.DevicePath $reducedWidth $reducedHeight $true
 
     $config = Read-Config
     $id = Get-StableMonitorId $active.DevicePath
@@ -938,7 +983,7 @@ function Invoke-ResolutionChange($Pair, [int]$Width, [int]$Height, [bool]$Center
     $active = $Pair.Active
     $registered = $Pair.Config
 
-    Assert-ModeSupported $active $Width $Height
+    Assert-DisplayConfigResolutionValid $active $registered.DevicePath $Width $Height $Center
 
     $rc = [DisplayConfigNative]::SetCcdResolution(
         $active.GdiName,
