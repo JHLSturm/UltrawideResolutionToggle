@@ -8,6 +8,7 @@ $Programs = [Environment]::GetFolderPath('Programs')
 $AppTitle = 'Ultrawide-Auflösung'
 $ToggleShortcut = Join-Path $Programs 'Ultrawide-Auflösung umschalten.lnk'
 $UninstallShortcut = Join-Path $Programs 'Ultrawide-Auflösung deinstallieren.lnk'
+$TaskbarShortcut = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Ultrawide-Auflösung umschalten.lnk'
 
 function Show-Message(
     [string]$Text,
@@ -39,6 +40,47 @@ function Get-RestoreNativeScript {
     }
 
     return $null
+}
+
+function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
+    if (-not (Test-Path $ShortcutPath)) {
+        return $false
+    }
+
+    $ShellApplication = New-Object -ComObject Shell.Application
+    $Folder = $ShellApplication.Namespace((Split-Path $ShortcutPath -Parent))
+    if (-not $Folder) {
+        return $false
+    }
+
+    $Item = $Folder.ParseName((Split-Path $ShortcutPath -Leaf))
+    if (-not $Item) {
+        return $false
+    }
+
+    foreach ($Verb in $Item.Verbs()) {
+        $VerbName = ($Verb.Name -replace '&', '').Trim()
+        foreach ($Pattern in $VerbPatterns) {
+            if ($VerbName -match $Pattern) {
+                $Verb.DoIt()
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Remove-TaskbarShortcut {
+    foreach ($ShortcutPath in @($TaskbarShortcut, $ToggleShortcut)) {
+        Invoke-ShortcutVerb $ShortcutPath @(
+            'Taskleiste.*lösen',
+            'Von.*Taskleiste',
+            'Unpin.*taskbar'
+        ) | Out-Null
+    }
+
+    Remove-Item -Path $TaskbarShortcut -Force -ErrorAction SilentlyContinue
 }
 
 function Start-DeferredInstallDirRemoval([string]$Path) {
@@ -151,6 +193,7 @@ try {
         }
     }
 
+    Remove-TaskbarShortcut
     Remove-Item -Path $ToggleShortcut -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $UninstallShortcut -Force -ErrorAction SilentlyContinue
 
@@ -161,10 +204,10 @@ try {
     }
 
     if ($cleanupScheduled) {
-        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü-Verknüpfungen wurden entfernt. Die installierten Skripte und die gespeicherte Monitorbindung werden nach dem Schließen dieses Dialogs gelöscht."
+        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü- und Taskleisten-Verknüpfungen wurden entfernt. Die installierten Skripte und die gespeicherte Monitorbindung werden nach dem Schließen dieses Dialogs gelöscht."
     }
     else {
-        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü-Verknüpfungen, installierte Skripte und gespeicherte Monitorbindung wurden entfernt."
+        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü- und Taskleisten-Verknüpfungen, installierte Skripte und gespeicherte Monitorbindung wurden entfernt."
     }
 }
 catch {

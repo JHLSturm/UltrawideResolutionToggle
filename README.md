@@ -11,12 +11,14 @@ Die niedrigere Auflösung wird über die Windows Display Configuration API geset
 
 1. Falls vorhanden: alte Taskleisten-Verknüpfung lösen.
 2. `Install.cmd` starten.
-3. Den neuen Startmenü-Eintrag **Ultrawide-Auflösung umschalten** an die Taskleiste anheften.
+3. Der Installer legt Startmenü-Einträge an und versucht, **Ultrawide-Auflösung umschalten** an die Taskleiste anzuheften.
 
 Der Installer kopiert die Skripte nach `%LOCALAPPDATA%\ResolutionToggle`, bindet den aktuell passenden Monitor und legt zwei Startmenü-Einträge an:
 
 - **Ultrawide-Auflösung umschalten**
 - **Ultrawide-Auflösung deinstallieren**
+
+Hinweis: Windows kann automatisches Anheften an die Taskleiste je nach Version oder Richtlinie blockieren. In dem Fall bleibt der Startmenü-Eintrag als Fallback verfügbar.
 
 ## Deinstallation
 
@@ -25,6 +27,7 @@ Der Installer kopiert die Skripte nach `%LOCALAPPDATA%\ResolutionToggle`, bindet
 Der Uninstaller fragt, ob vor dem Entfernen wieder auf `5120 x 1440` zurückgeschaltet werden soll. Danach entfernt er:
 
 - die Startmenü-Verknüpfungen
+- die Taskleisten-Verknüpfung, soweit Windows den Pin freigibt
 - die installierten Skripte unter `%LOCALAPPDATA%\ResolutionToggle`
 - die gespeicherte Monitorbindung
 

@@ -1,6 +1,49 @@
 ﻿$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 
+function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
+    if (-not (Test-Path $ShortcutPath)) {
+        return $false
+    }
+
+    $ShellApplication = New-Object -ComObject Shell.Application
+    $Folder = $ShellApplication.Namespace((Split-Path $ShortcutPath -Parent))
+    if (-not $Folder) {
+        return $false
+    }
+
+    $Item = $Folder.ParseName((Split-Path $ShortcutPath -Leaf))
+    if (-not $Item) {
+        return $false
+    }
+
+    foreach ($Verb in $Item.Verbs()) {
+        $VerbName = ($Verb.Name -replace '&', '').Trim()
+        foreach ($Pattern in $VerbPatterns) {
+            if ($VerbName -match $Pattern) {
+                $Verb.DoIt()
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Add-TaskbarShortcut([string]$SourceShortcutPath) {
+    $TaskbarDir = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
+    $TaskbarShortcutPath = Join-Path $TaskbarDir 'Ultrawide-Auflösung umschalten.lnk'
+
+    New-Item -ItemType Directory -Path $TaskbarDir -Force | Out-Null
+    Copy-Item $SourceShortcutPath $TaskbarShortcutPath -Force
+
+    Invoke-ShortcutVerb $SourceShortcutPath @(
+        'Taskleiste.*anheften',
+        'An.*Taskleiste',
+        'Pin.*taskbar'
+    ) | Out-Null
+}
+
 try {
     $Source = Join-Path $PSScriptRoot 'ResolutionToggle-v4_1.ps1'
     $LauncherSource = Join-Path $PSScriptRoot 'LaunchHidden.vbs'
@@ -38,6 +81,7 @@ try {
     $Shortcut.Description = '5120 x 1440 <-> zentrierte 2560 x 1440'
     $Shortcut.IconLocation = "$env:SystemRoot\System32\DisplaySwitch.exe,0"
     $Shortcut.Save()
+    Add-TaskbarShortcut $ShortcutPath
 
     $UninstallShortcut = $Shell.CreateShortcut($UninstallShortcutPath)
     $UninstallShortcut.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -55,7 +99,7 @@ try {
     }
 
     [System.Windows.Forms.MessageBox]::Show(
-        "Version 4.1 wurde installiert.`n`nStartmenü-Einträge:`n- Ultrawide-Auflösung umschalten`n- Ultrawide-Auflösung deinstallieren`n`nDiese Version korrigiert zusätzlich die native DISPLAYCONFIG_PATH_TARGET_INFO-Struktur und verwendet die Windows Display Configuration API für den zentrierten Wechsel.",
+        "Version 4.1 wurde installiert.`n`nStartmenü-Einträge:`n- Ultrawide-Auflösung umschalten`n- Ultrawide-Auflösung deinstallieren`n`nDie Taskleisten-Verknüpfung wurde vorbereitet. Falls Windows sie nicht sofort anzeigt, ist der Startmenü-Eintrag weiterhin verfügbar.",
         "Ultrawide-Auflösung",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
