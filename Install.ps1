@@ -62,7 +62,7 @@ try {
         'Manage-Monitors.cmd',
         'Diagnose.cmd',
         'Uninstall.ps1',
-        'README.txt'
+        'README.md'
     )
 
     foreach ($name in $required) {
