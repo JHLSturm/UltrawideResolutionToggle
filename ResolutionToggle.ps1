@@ -280,6 +280,8 @@ public static class DisplayConfigNative
         public int Frequency;
         public int SourceX;
         public int SourceY;
+        public int DisplayConfigSourceWidth;
+        public int DisplayConfigSourceHeight;
         public int TargetWidth;
         public int TargetHeight;
         public uint Scaling;
@@ -487,6 +489,8 @@ public static class DisplayConfigNative
                 int frequency = 0;
                 int sourceX = 0;
                 int sourceY = 0;
+                int displayConfigSourceWidth = 0;
+                int displayConfigSourceHeight = 0;
                 int targetWidth = 0;
                 int targetHeight = 0;
 
@@ -501,8 +505,12 @@ public static class DisplayConfigNative
                 uint sourceIndex = p.sourceInfo.modeInfoIdx;
                 if (sourceIndex < modeCount && modes[sourceIndex].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE) {
                     DISPLAYCONFIG_SOURCE_MODE sourceMode = modes[sourceIndex].modeInfo.sourceMode;
-                    width = (int)sourceMode.width;
-                    height = (int)sourceMode.height;
+                    displayConfigSourceWidth = (int)sourceMode.width;
+                    displayConfigSourceHeight = (int)sourceMode.height;
+                    if (width <= 0 || height <= 0) {
+                        width = displayConfigSourceWidth;
+                        height = displayConfigSourceHeight;
+                    }
                     sourceX = sourceMode.position.x;
                     sourceY = sourceMode.position.y;
                 }
@@ -527,6 +535,8 @@ public static class DisplayConfigNative
                     Frequency = frequency,
                     SourceX = sourceX,
                     SourceY = sourceY,
+                    DisplayConfigSourceWidth = displayConfigSourceWidth,
+                    DisplayConfigSourceHeight = displayConfigSourceHeight,
                     TargetWidth = targetWidth,
                     TargetHeight = targetHeight,
                     Scaling = p.targetInfo.scaling,
@@ -1212,6 +1222,7 @@ function Write-Diagnosis {
         $lines.Add(('Source Id: ' + $m.SourceId))
         $lines.Add(('Target Id: ' + $m.TargetId))
         $lines.Add(('Aktuelle Source-Aufloesung: {0} x {1} @ {2} Hz' -f $m.Width, $m.Height, $m.Frequency))
+        $lines.Add(('DisplayConfig Source-Mode: {0} x {1}' -f $m.DisplayConfigSourceWidth, $m.DisplayConfigSourceHeight))
         $lines.Add(('Source-Position: {0},{1}' -f $m.SourceX, $m.SourceY))
         $lines.Add(('Aktuelle Target-Aufloesung: {0} x {1}' -f $m.TargetWidth, $m.TargetHeight))
         $lines.Add(('Scaling-Modus: {0} ({1})' -f $m.Scaling, (Get-ScalingName $m.Scaling)))
