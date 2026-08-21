@@ -1,10 +1,10 @@
 @echo off
-title Ultrawide Resolution Toggle v4.1 - Deinstallation
+title Ultrawide Resolution Toggle - Deinstallation
 echo.
-echo Ultrawide Resolution Toggle v4.1
-echo ================================
+echo Ultrawide Resolution Toggle
+echo ===========================
 echo.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Uninstall-v4_1.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Uninstall.ps1"
 set EC=%errorlevel%
 echo.
 if not "%EC%"=="0" (

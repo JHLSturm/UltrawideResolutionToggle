@@ -2,12 +2,17 @@
 Add-Type -AssemblyName System.Windows.Forms
 
 $InstallDir = Join-Path $env:LOCALAPPDATA 'ResolutionToggle'
-$InstalledToggleScript = Join-Path $InstallDir 'ResolutionToggle-v4_1.ps1'
-$BundledToggleScript = Join-Path $PSScriptRoot 'ResolutionToggle-v4_1.ps1'
+$InstalledToggleScript = Join-Path $InstallDir 'ResolutionToggle.ps1'
+$BundledToggleScript = Join-Path $PSScriptRoot 'ResolutionToggle.ps1'
 $Programs = [Environment]::GetFolderPath('Programs')
-$AppTitle = 'Ultrawide-Auflösung'
-$ToggleShortcut = Join-Path $Programs 'Ultrawide-Auflösung umschalten.lnk'
-$UninstallShortcut = Join-Path $Programs 'Ultrawide-Auflösung deinstallieren.lnk'
+$AppTitle = 'Ultrawide-Aufloesung'
+$ShortcutNames = @(
+    'Ultrawide-Auflösung umschalten.lnk',
+    'Ultrawide-Monitor registrieren.lnk',
+    'Ultrawide-Monitore verwalten.lnk',
+    'Ultrawide-Auflösung Diagnose.lnk',
+    'Ultrawide-Auflösung deinstallieren.lnk'
+)
 $TaskbarShortcut = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar\Ultrawide-Auflösung umschalten.lnk'
 
 function Show-Message(
@@ -21,25 +26,6 @@ function Show-Message(
         [System.Windows.Forms.MessageBoxButtons]::OK,
         $Icon
     ) | Out-Null
-}
-
-function Get-RestoreNativeScript {
-    $candidates = @($BundledToggleScript, $InstalledToggleScript) |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        Select-Object -Unique
-
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path $candidate)) {
-            continue
-        }
-
-        $scriptText = Get-Content -Path $candidate -Raw
-        if ($scriptText -match '\[switch\]\$RestoreNative') {
-            return $candidate
-        }
-    }
-
-    return $null
 }
 
 function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
@@ -72,7 +58,7 @@ function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
 }
 
 function Remove-TaskbarShortcut {
-    foreach ($ShortcutPath in @($TaskbarShortcut, $ToggleShortcut)) {
+    foreach ($ShortcutPath in @($TaskbarShortcut, (Join-Path $Programs 'Ultrawide-Auflösung umschalten.lnk'))) {
         Invoke-ShortcutVerb $ShortcutPath @(
             'Taskleiste.*lösen',
             'Von.*Taskleiste',
@@ -81,6 +67,16 @@ function Remove-TaskbarShortcut {
     }
 
     Remove-Item -Path $TaskbarShortcut -Force -ErrorAction SilentlyContinue
+}
+
+function Get-RestoreNativeScript {
+    foreach ($candidate in @($BundledToggleScript, $InstalledToggleScript)) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
 function Start-DeferredInstallDirRemoval([string]$Path) {
@@ -148,7 +144,7 @@ Remove-Item -LiteralPath $CleanupScript -Force -ErrorAction SilentlyContinue
 try {
     if ((Test-Path $BundledToggleScript) -or (Test-Path $InstalledToggleScript)) {
         $restore = [System.Windows.Forms.MessageBox]::Show(
-            "Soll vor der Deinstallation auf 5120 × 1440 zurückgeschaltet werden?`n`nWähle Nein, wenn die aktuelle Auflösung unverändert bleiben soll.",
+            "Sollen aktive registrierte Monitore vor der Deinstallation auf ihre native Aufloesung zurueckgeschaltet werden?`n`nNicht registrierte Displays werden nicht veraendert.",
             ($AppTitle + ' deinstallieren'),
             [System.Windows.Forms.MessageBoxButtons]::YesNoCancel,
             [System.Windows.Forms.MessageBoxIcon]::Question
@@ -160,26 +156,13 @@ try {
 
         if ($restore -eq [System.Windows.Forms.DialogResult]::Yes) {
             $restoreScript = Get-RestoreNativeScript
-
-            if ([string]::IsNullOrWhiteSpace($restoreScript)) {
-                $continue = [System.Windows.Forms.MessageBox]::Show(
-                    "Es wurde kein aktuelles Toggle-Skript mit gezielter 5120 × 1440-Wiederherstellung gefunden.`n`nDie Auflösung wird deshalb nicht verändert.`n`nTrotzdem deinstallieren?",
-                    ($AppTitle + ' deinstallieren'),
-                    [System.Windows.Forms.MessageBoxButtons]::YesNo,
-                    [System.Windows.Forms.MessageBoxIcon]::Warning
-                )
-
-                if ($continue -ne [System.Windows.Forms.DialogResult]::Yes) {
-                    exit 1
-                }
-            }
-            else {
+            if ($null -ne $restoreScript) {
                 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
                     -NoProfile -ExecutionPolicy Bypass -File "$restoreScript" -RestoreNative
 
                 if ($LASTEXITCODE -ne 0) {
                     $continue = [System.Windows.Forms.MessageBox]::Show(
-                        "Die Wiederherstellung auf 5120 × 1440 wurde nicht erfolgreich bestätigt (Exit-Code $LASTEXITCODE).`n`nTrotzdem deinstallieren?",
+                        "Die native Wiederherstellung wurde nicht erfolgreich bestaetigt (Exit-Code $LASTEXITCODE).`n`nTrotzdem deinstallieren?",
                         ($AppTitle + ' deinstallieren'),
                         [System.Windows.Forms.MessageBoxButtons]::YesNo,
                         [System.Windows.Forms.MessageBoxIcon]::Warning
@@ -194,8 +177,10 @@ try {
     }
 
     Remove-TaskbarShortcut
-    Remove-Item -Path $ToggleShortcut -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path $UninstallShortcut -Force -ErrorAction SilentlyContinue
+
+    foreach ($name in $ShortcutNames) {
+        Remove-Item -Path (Join-Path $Programs $name) -Force -ErrorAction SilentlyContinue
+    }
 
     $cleanupScheduled = $false
     if (Test-Path $InstallDir) {
@@ -204,10 +189,10 @@ try {
     }
 
     if ($cleanupScheduled) {
-        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü- und Taskleisten-Verknüpfungen wurden entfernt. Die installierten Skripte und die gespeicherte Monitorbindung werden nach dem Schließen dieses Dialogs gelöscht."
+        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenue- und Taskleisten-Verknuepfungen wurden entfernt. Die installierten Dateien und die gespeicherte Konfiguration werden nach dem Schliessen dieses Dialogs geloescht."
     }
     else {
-        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert.`n`nStartmenü- und Taskleisten-Verknüpfungen, installierte Skripte und gespeicherte Monitorbindung wurden entfernt."
+        Show-Message "Ultrawide Resolution Toggle wurde deinstalliert."
     }
 }
 catch {
