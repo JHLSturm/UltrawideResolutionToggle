@@ -59,6 +59,7 @@ try {
     $required = @(
         'ResolutionToggle.ps1',
         'Localization.ps1',
+        'Write-LocalizedText.ps1',
         'LaunchHidden.vbs',
         'Register-Monitor.cmd',
         'Manage-Monitors.cmd',
