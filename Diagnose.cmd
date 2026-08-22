@@ -1,10 +1,12 @@
 @echo off
-title Ultrawide Resolution Toggle - Diagnose
-set "SCRIPT=%LOCALAPPDATA%\ResolutionToggle\ResolutionToggle.ps1"
+chcp 65001 >nul
+title Ultrawide Resolution Toggle
+set "BASE=%LOCALAPPDATA%\ResolutionToggle"
+set "SCRIPT=%BASE%\ResolutionToggle.ps1"
+if not exist "%SCRIPT%" set "BASE=%~dp0"
 if not exist "%SCRIPT%" set "SCRIPT=%~dp0ResolutionToggle.ps1"
-echo.
-echo Die Diagnose veraendert KEINE Aufloesung.
-echo.
+set "LOC=%BASE%\Localization.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ". ""%LOC%""; [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); Write-Host; Write-Host (Get-AppText -Key 'DiagnoseCmdHint'); Write-Host"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -Diagnose
 echo.
 pause

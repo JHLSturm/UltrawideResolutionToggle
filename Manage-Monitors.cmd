@@ -1,6 +1,9 @@
 @echo off
-title Ultrawide Resolution Toggle - Monitore verwalten
-set "SCRIPT=%LOCALAPPDATA%\ResolutionToggle\ResolutionToggle.ps1"
+chcp 65001 >nul
+title Ultrawide Resolution Toggle
+set "BASE=%LOCALAPPDATA%\ResolutionToggle"
+set "SCRIPT=%BASE%\ResolutionToggle.ps1"
+if not exist "%SCRIPT%" set "BASE=%~dp0"
 if not exist "%SCRIPT%" set "SCRIPT=%~dp0ResolutionToggle.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%" -Manage
 echo.

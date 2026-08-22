@@ -1,5 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
+. (Join-Path $PSScriptRoot 'Localization.ps1')
 
 function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
     if (-not (Test-Path $ShortcutPath)) {
@@ -32,7 +33,7 @@ function Invoke-ShortcutVerb([string]$ShortcutPath, [string[]]$VerbPatterns) {
 
 function Add-TaskbarShortcut([string]$SourceShortcutPath) {
     $TaskbarDir = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
-    $TaskbarShortcutPath = Join-Path $TaskbarDir 'Ultrawide-Auflösung umschalten.lnk'
+    $TaskbarShortcutPath = Join-Path $TaskbarDir (Get-AppText 'ToggleShortcutName')
 
     New-Item -ItemType Directory -Path $TaskbarDir -Force | Out-Null
     Copy-Item $SourceShortcutPath $TaskbarShortcutPath -Force
@@ -57,6 +58,7 @@ function New-Shortcut($Shell, [string]$Path, [string]$TargetPath, [string]$Argum
 try {
     $required = @(
         'ResolutionToggle.ps1',
+        'Localization.ps1',
         'LaunchHidden.vbs',
         'Register-Monitor.cmd',
         'Manage-Monitors.cmd',
@@ -68,7 +70,7 @@ try {
     foreach ($name in $required) {
         $path = Join-Path $PSScriptRoot $name
         if (-not (Test-Path $path)) {
-            throw "$name wurde nicht gefunden."
+            throw (Get-AppText 'RequiredFileMissing' $name)
         }
     }
 
@@ -84,31 +86,31 @@ try {
     $PowerShell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $WScript = "$env:SystemRoot\System32\wscript.exe"
 
-    $ToggleShortcutPath = Join-Path $Programs 'Ultrawide-Auflösung umschalten.lnk'
-    $RegisterShortcutPath = Join-Path $Programs 'Ultrawide-Monitor registrieren.lnk'
-    $ManageShortcutPath = Join-Path $Programs 'Ultrawide-Monitore verwalten.lnk'
-    $DiagnoseShortcutPath = Join-Path $Programs 'Ultrawide-Auflösung Diagnose.lnk'
-    $UninstallShortcutPath = Join-Path $Programs 'Ultrawide-Auflösung deinstallieren.lnk'
+    $ToggleShortcutPath = Join-Path $Programs (Get-AppText 'ToggleShortcutName')
+    $RegisterShortcutPath = Join-Path $Programs (Get-AppText 'RegisterShortcutName')
+    $ManageShortcutPath = Join-Path $Programs (Get-AppText 'ManageShortcutName')
+    $DiagnoseShortcutPath = Join-Path $Programs (Get-AppText 'DiagnoseShortcutName')
+    $UninstallShortcutPath = Join-Path $Programs (Get-AppText 'UninstallShortcutName')
 
-    New-Shortcut $Shell $ToggleShortcutPath $WScript "`"$(Join-Path $InstallDir 'LaunchHidden.vbs')`"" $InstallDir 'Registrierten Ultrawide-Monitor umschalten' "$env:SystemRoot\System32\DisplaySwitch.exe,0"
-    New-Shortcut $Shell $RegisterShortcutPath $PowerShell "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $InstallDir 'ResolutionToggle.ps1')`" -Register" $InstallDir 'Ultrawide-Monitor unter dem Mauszeiger registrieren' "$env:SystemRoot\System32\DisplaySwitch.exe,0"
-    New-Shortcut $Shell $ManageShortcutPath (Join-Path $InstallDir 'Manage-Monitors.cmd') '' $InstallDir 'Registrierte Ultrawide-Monitore verwalten' "$env:SystemRoot\System32\shell32.dll,70"
-    New-Shortcut $Shell $DiagnoseShortcutPath (Join-Path $InstallDir 'Diagnose.cmd') '' $InstallDir 'Diagnose ohne Anzeigeaenderung erstellen' "$env:SystemRoot\System32\shell32.dll,23"
-    New-Shortcut $Shell $UninstallShortcutPath $PowerShell "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $InstallDir 'Uninstall.ps1')`"" $env:TEMP 'Ultrawide Resolution Toggle deinstallieren' "$env:SystemRoot\System32\shell32.dll,31"
+    New-Shortcut $Shell $ToggleShortcutPath $WScript "`"$(Join-Path $InstallDir 'LaunchHidden.vbs')`"" $InstallDir (Get-AppText 'ToggleDescription') "$env:SystemRoot\System32\DisplaySwitch.exe,0"
+    New-Shortcut $Shell $RegisterShortcutPath $PowerShell "-NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $InstallDir 'ResolutionToggle.ps1')`" -Register" $InstallDir (Get-AppText 'RegisterDescription') "$env:SystemRoot\System32\DisplaySwitch.exe,0"
+    New-Shortcut $Shell $ManageShortcutPath (Join-Path $InstallDir 'Manage-Monitors.cmd') '' $InstallDir (Get-AppText 'ManageDescription') "$env:SystemRoot\System32\shell32.dll,70"
+    New-Shortcut $Shell $DiagnoseShortcutPath (Join-Path $InstallDir 'Diagnose.cmd') '' $InstallDir (Get-AppText 'DiagnoseDescription') "$env:SystemRoot\System32\shell32.dll,23"
+    New-Shortcut $Shell $UninstallShortcutPath $PowerShell "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $InstallDir 'Uninstall.ps1')`"" $env:TEMP (Get-AppText 'UninstallDescription') "$env:SystemRoot\System32\shell32.dll,31"
 
     Add-TaskbarShortcut $ToggleShortcutPath
 
     [System.Windows.Forms.MessageBox]::Show(
-        "Ultrawide Resolution Toggle wurde installiert.`n`nZum ersten Registrieren den Mauszeiger auf den gewuenschten Ultrawide bewegen und Ultrawide-Aufloesung umschalten starten. Der erste Klick registriert nur, der naechste schaltet um.`n`nWeitere Monitore koennen ueber Ultrawide-Monitor registrieren hinzugefuegt werden.`n`nStartmenue-Eintraege:`n- Ultrawide-Aufloesung umschalten`n- Ultrawide-Monitor registrieren`n- Ultrawide-Monitore verwalten`n- Ultrawide-Aufloesung Diagnose`n- Ultrawide-Aufloesung deinstallieren",
-        "Ultrawide-Aufloesung",
+        (Get-AppText 'InstallSuccess'),
+        (Get-AppText 'AppTitle'),
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Information
     ) | Out-Null
 }
 catch {
     [System.Windows.Forms.MessageBox]::Show(
-        "Installation fehlgeschlagen:`n`n$($_.Exception.Message)",
-        "Installation fehlgeschlagen",
+        (Get-AppText 'InstallFailed' $_.Exception.Message),
+        (Get-AppText 'InstallFailedTitle'),
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
     ) | Out-Null

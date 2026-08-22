@@ -10,6 +10,7 @@
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
+. (Join-Path $PSScriptRoot 'Localization.ps1')
 
 $AppDir = Join-Path $env:LOCALAPPDATA 'ResolutionToggle'
 $ConfigPath = Join-Path $AppDir 'config.json'
@@ -19,7 +20,7 @@ $DefaultReducedHeight = 1440
 
 New-Item -ItemType Directory -Path $AppDir -Force | Out-Null
 
-function Show-Info([string]$Text, [string]$Title = 'Ultrawide-Aufloesung') {
+function Show-Info([string]$Text, [string]$Title = (Get-AppText 'AppTitle')) {
     [System.Windows.Forms.MessageBox]::Show(
         $Text, $Title,
         [System.Windows.Forms.MessageBoxButtons]::OK,
@@ -29,7 +30,7 @@ function Show-Info([string]$Text, [string]$Title = 'Ultrawide-Aufloesung') {
 
 function Show-ErrorMessage([string]$Text) {
     [System.Windows.Forms.MessageBox]::Show(
-        $Text, 'Ultrawide-Aufloesung - Fehler',
+        $Text, (Get-AppText 'ErrorTitle'),
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
     ) | Out-Null
@@ -733,7 +734,7 @@ function Initialize-NativeApi {
 
     $layoutError = [DisplayConfigNative]::ValidateNativeLayouts()
     if (-not [string]::IsNullOrWhiteSpace($layoutError)) {
-        throw "Interner DisplayConfig-Strukturfehler: $layoutError"
+        throw (Get-AppText 'LayoutError' $layoutError)
     }
 }
 
@@ -812,7 +813,7 @@ function Get-ActiveRegisteredMonitors($Config) {
             }
         }
         elseif ($matches.Count -gt 1) {
-            throw "Ein registrierter DevicePath wurde mehrfach gefunden: $($registered.DevicePath)"
+            throw (Get-AppText 'DuplicateActiveDevicePath' $registered.DevicePath)
         }
     }
 
@@ -853,7 +854,7 @@ function Get-NativeResolution($ActiveMonitor) {
 
 function Assert-ModeSupported($ActiveMonitor, [int]$Width, [int]$Height) {
     if (-not [DisplayConfigNative]::Supports($ActiveMonitor.GdiName, $Width, $Height)) {
-        throw "$($ActiveMonitor.FriendlyName) [$($ActiveMonitor.GdiName)] meldet $Width x $Height nicht als unterstuetzten Source-Modus."
+        throw (Get-AppText 'UnsupportedSourceMode' $ActiveMonitor.FriendlyName, $ActiveMonitor.GdiName, $Width, $Height)
     }
 }
 
@@ -868,13 +869,13 @@ function Assert-DisplayConfigResolutionValid($ActiveMonitor, [string]$DevicePath
 
     if ($rc -ne 0) {
         $modeListHint = if ([DisplayConfigNative]::Supports($ActiveMonitor.GdiName, $Width, $Height)) {
-            'Der Modus wird von EnumDisplaySettings gemeldet.'
+            Get-AppText 'ModeListed'
         }
         else {
-            'Der Modus wird von EnumDisplaySettings nicht gemeldet.'
+            Get-AppText 'ModeNotListed'
         }
 
-        throw "$($ActiveMonitor.FriendlyName) [$($ActiveMonitor.GdiName)] hat die DisplayConfig-Validierung fuer $Width x $Height abgelehnt. Fehlercode: $rc. $modeListHint"
+        throw (Get-AppText 'ValidationRejected' $ActiveMonitor.FriendlyName, $ActiveMonitor.GdiName, $Width, $Height, $rc, $modeListHint)
     }
 }
 
@@ -893,7 +894,7 @@ function Get-ModeSummary($ActiveMonitor, [int]$MaxCount = 20) {
                     @{ Expression = { $_.Frequency }; Descending = $true })
 
     if ($modes.Count -eq 0) {
-        return 'Keine Modi gemeldet.'
+        return (Get-AppText 'NoModesReported')
     }
 
     $items = @($modes | Select-Object -First $MaxCount | ForEach-Object {
@@ -901,7 +902,7 @@ function Get-ModeSummary($ActiveMonitor, [int]$MaxCount = 20) {
     })
 
     if ($modes.Count -gt $MaxCount) {
-        $items += ('... plus {0} weitere' -f ($modes.Count - $MaxCount))
+        $items += (Get-AppText 'AdditionalModes' ($modes.Count - $MaxCount))
     }
 
     return ($items -join '; ')
@@ -909,13 +910,13 @@ function Get-ModeSummary($ActiveMonitor, [int]$MaxCount = 20) {
 
 function Show-UnsupportedReducedModeMessage($ActiveMonitor, [int]$Width, [int]$Height, [int]$ExitCode) {
     $modeHint = if (Test-DisplayModeListed $ActiveMonitor $Width $Height) {
-        "Windows meldet diesen Modus zwar in der klassischen Modusliste, DisplayConfig akzeptiert ihn aber nicht exakt."
+        Get-AppText 'ReducedModeClassicListed'
     }
     else {
-        "Windows meldet diesen Modus fuer diesen Monitor nicht als auswaehlbaren Modus."
+        Get-AppText 'ReducedModeNotListed'
     }
 
-    Show-Info "Dieser Monitor bietet $Width x $Height nicht als exakt nutzbaren Modus an.`n`nMonitor: $($ActiveMonitor.FriendlyName) [$($ActiveMonitor.GdiName)]`n`n$modeHint`n`nDer Monitor bleibt nativ. Es wurde nichts veraendert."
+    Show-Info (Get-AppText 'UnsupportedReducedMode' $Width, $Height, $ActiveMonitor.FriendlyName, $ActiveMonitor.GdiName, $modeHint)
     exit $ExitCode
 }
 
@@ -931,7 +932,7 @@ function Register-MonitorUnderCursor {
     $active = $cursorInfo.Active
 
     if (-not $cursor.Found -or $null -eq $active) {
-        Show-Info "Der Monitor unter dem Mauszeiger konnte nicht eindeutig einer aktiven DisplayConfig-Anzeige zugeordnet werden.`n`nEs wurde nichts registriert."
+        Show-Info (Get-AppText 'CursorMonitorNotMapped')
         exit 40
     }
 
@@ -940,7 +941,7 @@ function Register-MonitorUnderCursor {
     $reducedHeight = $DefaultReducedHeight
 
     if ($native.Width -le $reducedWidth -or $native.Height -ne $reducedHeight) {
-        Show-Info "Der Bildschirm unter dem Mauszeiger ist kein passender 1440p-Ultrawide.`n`nErkannt: $($active.FriendlyName) [$($active.GdiName)]`nNative Aufloesung: $($native.Width) x $($native.Height)`n`nEs wurde nichts registriert."
+        Show-Info (Get-AppText 'NotMatchingUltrawide' $active.FriendlyName, $active.GdiName, $native.Width, $native.Height)
         exit 41
     }
 
@@ -978,7 +979,7 @@ function Register-MonitorUnderCursor {
     })
 
     if ($existing.Count -gt 1) {
-        throw "Die Konfiguration enthaelt denselben DevicePath mehrfach. Bitte Manage-Monitors.cmd zum Bereinigen verwenden."
+        throw (Get-AppText 'DuplicateConfigDevicePath')
     }
 
     if ($existing.Count -eq 1) {
@@ -987,7 +988,7 @@ function Register-MonitorUnderCursor {
         })
         $config.Monitors = @($remaining + $entry)
         Write-Config $config
-        Show-Info "Monitor wurde aktualisiert:`n`n$($entry.FriendlyName)`n$($entry.LastSeenGdiName)`n$($entry.NativeWidth) x $($entry.NativeHeight) <-> $($entry.ReducedWidth) x $($entry.ReducedHeight)"
+        Show-Info (Get-AppText 'MonitorUpdated' $entry.FriendlyName, $entry.LastSeenGdiName, $entry.NativeWidth, $entry.NativeHeight, $entry.ReducedWidth, $entry.ReducedHeight)
         return
     }
 
@@ -995,11 +996,11 @@ function Register-MonitorUnderCursor {
     Write-Config $config
 
     if ($FromToggle) {
-        Show-Info "Monitor wurde registriert:`n`n$($entry.FriendlyName)`n$($entry.LastSeenGdiName)`n$($entry.NativeWidth) x $($entry.NativeHeight) <-> $($entry.ReducedWidth) x $($entry.ReducedHeight)`n`nDie Aufloesung wurde noch nicht veraendert. Druecke den Toggle erneut, um diesen Monitor umzuschalten."
+        Show-Info (Get-AppText 'MonitorRegisteredToggle' $entry.FriendlyName, $entry.LastSeenGdiName, $entry.NativeWidth, $entry.NativeHeight, $entry.ReducedWidth, $entry.ReducedHeight)
         return
     }
 
-    Show-Info "Monitor wurde registriert:`n`n$($entry.FriendlyName)`n$($entry.LastSeenGdiName)`n$($entry.NativeWidth) x $($entry.NativeHeight) <-> $($entry.ReducedWidth) x $($entry.ReducedHeight)`n`nEs werden weiterhin ausschliesslich registrierte DevicePaths umgeschaltet."
+    Show-Info (Get-AppText 'MonitorRegistered' $entry.FriendlyName, $entry.LastSeenGdiName, $entry.NativeWidth, $entry.NativeHeight, $entry.ReducedWidth, $entry.ReducedHeight)
 }
 
 function Select-ToggleTarget {
@@ -1008,7 +1009,7 @@ function Select-ToggleTarget {
     $activeRegistered = @(Get-ActiveRegisteredMonitors $Config)
 
     if ($activeRegistered.Count -eq 0) {
-        Show-Info "Kein registrierter Ultrawide-Monitor ist aktuell angeschlossen."
+        Show-Info (Get-AppText 'NoActiveRegistered')
         exit 20
     }
 
@@ -1018,7 +1019,7 @@ function Select-ToggleTarget {
 
     $cursor = [DisplayConfigNative]::GetCursorMonitor()
     if (-not $cursor.Found) {
-        Show-Info "Der aktuelle Bildschirm konnte nicht ermittelt werden.`n`nEs wurde nichts veraendert."
+        Show-Info (Get-AppText 'CurrentDisplayUnknown')
         exit 21
     }
 
@@ -1030,7 +1031,7 @@ function Select-ToggleTarget {
         return $matches[0]
     }
 
-    Show-Info "Der aktuelle Bildschirm ist nicht fuer die Aufloesungsumschaltung registriert."
+    Show-Info (Get-AppText 'CurrentDisplayNotRegistered')
     exit 22
 }
 
@@ -1058,7 +1059,7 @@ function Invoke-ResolutionChange($Pair, [int]$Width, [int]$Height, [bool]$Center
     )
 
     if ($rc -ne 0) {
-        Show-ErrorMessage "Windows DisplayConfig hat den Wechsel auf $Width x $Height abgelehnt.`n`nFehlercode: $rc`n`nEs wurde kein anderer Monitor veraendert."
+        Show-ErrorMessage (Get-AppText 'DisplayConfigChangeRejected' $Width, $Height, $rc)
         exit 30
     }
 
@@ -1069,12 +1070,12 @@ function Invoke-ResolutionChange($Pair, [int]$Width, [int]$Height, [bool]$Center
     })
 
     if ($after.Count -ne 1) {
-        Show-ErrorMessage "Der Zielmonitor konnte nach dem Wechsel nicht mehr eindeutig gefunden werden.`n`nAngefordert war $Width x $Height. Bitte Diagnose.cmd ausfuehren."
+        Show-ErrorMessage (Get-AppText 'TargetMissingAfterChange' $Width, $Height)
         exit 31
     }
 
     if ($after[0].Width -ne $Width -or $after[0].Height -ne $Height) {
-        Show-ErrorMessage "Windows hat nicht die angeforderte Aufloesung gesetzt.`n`nAngefordert: $Width x $Height`nTatsaechlich: $($after[0].Width) x $($after[0].Height)`n`nBitte Diagnose.cmd ausfuehren. Es wurde kein weiterer Monitor veraendert."
+        Show-ErrorMessage (Get-AppText 'ResolutionMismatch' $Width, $Height, $after[0].Width, $after[0].Height)
         exit 32
     }
 }
@@ -1108,7 +1109,7 @@ function Toggle-SelectedMonitor {
         exit 0
     }
 
-    Show-Info "Der registrierte Monitor laeuft aktuell mit $($active.Width) x $($active.Height).`n`nDieses Profil schaltet nur zwischen $nativeWidth x $nativeHeight und $reducedWidth x $reducedHeight.`n`nEs wurde nichts veraendert."
+    Show-Info (Get-AppText 'UnexpectedCurrentResolution' $active.Width, $active.Height, $nativeWidth, $nativeHeight, $reducedWidth, $reducedHeight)
     exit 23
 }
 
@@ -1142,10 +1143,11 @@ function Write-MonitorList {
     $registered = @(Get-RegisteredMonitors $config)
 
     Write-Host ''
-    Write-Host 'Registrierte Ultrawide-Monitore'
-    Write-Host '================================'
+    $title = Get-AppText 'ListTitle'
+    Write-Host $title
+    Write-Host ('=' * $title.Length)
     if ($registered.Count -eq 0) {
-        Write-Host 'Keine registrierten Monitore.'
+        Write-Host (Get-AppText 'NoRegisteredMonitors')
         return
     }
 
@@ -1154,7 +1156,7 @@ function Write-MonitorList {
         $isActive = @($active | Where-Object {
             [string]::Equals($_.DevicePath, $r.DevicePath, [System.StringComparison]::OrdinalIgnoreCase)
         }).Count -eq 1
-        $state = if ($isActive) { 'aktiv' } else { 'nicht aktiv' }
+        $state = if ($isActive) { Get-AppText 'ActiveState' } else { Get-AppText 'InactiveState' }
         Write-Host ("[{0}] {1} - {2} x {3} <-> {4} x {5} - {6}" -f ($i + 1), $r.FriendlyName, $r.NativeWidth, $r.NativeHeight, $r.ReducedWidth, $r.ReducedHeight, $state)
         Write-Host ("    DevicePath: {0}" -f $r.DevicePath)
     }
@@ -1182,11 +1184,11 @@ function Invoke-Manage {
     while ($true) {
         Write-MonitorList
         Write-Host ''
-        Write-Host 'Aktionen:'
-        Write-Host '  R = Monitor per Nummer entfernen'
-        Write-Host '  C = Konfiguration komplett zuruecksetzen'
-        Write-Host '  Q = Beenden'
-        $choice = Read-Host 'Auswahl'
+        Write-Host (Get-AppText 'Actions')
+        Write-Host (Get-AppText 'RemoveAction')
+        Write-Host (Get-AppText 'ResetAction')
+        Write-Host (Get-AppText 'QuitAction')
+        $choice = Read-Host (Get-AppText 'ChoicePrompt')
 
         if ([string]::IsNullOrWhiteSpace($choice)) {
             continue
@@ -1195,34 +1197,34 @@ function Invoke-Manage {
         switch -Regex ($choice.Trim()) {
             '^[Qq]$' { return }
             '^[Cc]$' {
-                $confirm = Read-Host 'Wirklich alle Registrierungen entfernen? Tippe JA'
-                if ($confirm -eq 'JA') {
+                $confirm = Read-Host (Get-AppText 'ConfirmReset')
+                if (($confirm -eq 'JA') -or ($confirm -eq 'YES')) {
                     Reset-Configuration
-                    Write-Host 'Konfiguration wurde zurueckgesetzt.'
+                    Write-Host (Get-AppText 'ResetDone')
                 }
             }
             '^[Rr]$' {
                 $config = Read-Config
                 $registered = @(Get-RegisteredMonitors $config)
                 if ($registered.Count -eq 0) {
-                    Write-Host 'Keine registrierten Monitore.'
+                    Write-Host (Get-AppText 'NoRegisteredMonitors')
                     continue
                 }
 
-                $numberText = Read-Host 'Nummer des zu entfernenden Monitors'
+                $numberText = Read-Host (Get-AppText 'NumberPrompt')
                 $number = 0
                 if (-not [int]::TryParse($numberText, [ref]$number) -or $number -lt 1 -or $number -gt $registered.Count) {
-                    Write-Host 'Ungueltige Nummer.'
+                    Write-Host (Get-AppText 'InvalidNumber')
                     continue
                 }
 
                 $target = $registered[$number - 1]
                 if (Remove-RegisteredMonitorByDevicePath $target.DevicePath) {
-                    Write-Host 'Monitor wurde entfernt.'
+                    Write-Host (Get-AppText 'MonitorRemoved')
                 }
             }
             default {
-                Write-Host 'Ungueltige Auswahl.'
+                Write-Host (Get-AppText 'InvalidChoice')
             }
         }
     }
@@ -1247,37 +1249,38 @@ function Write-Diagnosis {
         } | Select-Object -First 1)
     }
 
-    $lines.Add('Ultrawide Resolution Toggle - Diagnose')
-    $lines.Add('======================================')
-    $lines.Add(('Zeit: ' + (Get-Date)))
-    $lines.Add(('PowerShell-Version: ' + $PSVersionTable.PSVersion))
+    $diagnosisTitle = Get-AppText 'DiagnosisTitle'
+    $lines.Add($diagnosisTitle)
+    $lines.Add(('=' * $diagnosisTitle.Length))
+    $lines.Add(((Get-AppText 'TimeLabel') + ': ' + (Get-Date)))
+    $lines.Add(((Get-AppText 'PowerShellVersionLabel') + ': ' + $PSVersionTable.PSVersion))
     $lines.Add(('ConfigPath: ' + $ConfigPath))
-    $lines.Add(('Native-Struct-Layout-Pruefung: ' + $layoutCheck))
+    $lines.Add(((Get-AppText 'LayoutCheckLabel') + ': ' + $layoutCheck))
     $lines.Add('')
 
-    $lines.Add('Monitor unter dem Mauszeiger:')
+    $lines.Add((Get-AppText 'CursorMonitorLabel'))
     if ($cursor.Found) {
-        $lines.Add(('  Position: {0},{1}' -f $cursor.X, $cursor.Y))
+        $lines.Add(('  {0}: {1},{2}' -f (Get-AppText 'PositionLabel'), $cursor.X, $cursor.Y))
         $lines.Add(('  GDI Name: ' + $cursor.GdiName))
-        $lines.Add(('  Bounds: {0},{1} - {2},{3}' -f $cursor.Left, $cursor.Top, $cursor.Right, $cursor.Bottom))
+        $lines.Add(('  {0}: {1},{2} - {3},{4}' -f (Get-AppText 'BoundsLabel'), $cursor.Left, $cursor.Top, $cursor.Right, $cursor.Bottom))
         if ($null -ne $cursorActive) {
             $cursorRegistered = @(Find-RegisteredConfigForActive $config $cursorActive).Count -eq 1
-            $lines.Add(('  DisplayConfig-Zuordnung: ' + $cursorActive.DevicePath))
-            $lines.Add(('  Registriert: ' + $(if ($cursorRegistered) { 'ja' } else { 'nein' })))
+            $lines.Add(('  {0}: {1}' -f (Get-AppText 'MappingLabel'), $cursorActive.DevicePath))
+            $lines.Add(('  {0}: {1}' -f (Get-AppText 'RegisteredLabel'), $(if ($cursorRegistered) { Get-AppText 'Yes' } else { Get-AppText 'No' })))
         }
         else {
-            $lines.Add('  DisplayConfig-Zuordnung: nicht gefunden')
+            $lines.Add((Get-AppText 'MappingNotFound'))
         }
     }
     else {
-        $lines.Add('  Nicht ermittelt')
+        $lines.Add((Get-AppText 'NotDetected'))
     }
     $lines.Add('')
 
-    $lines.Add(('Aktive Displays: ' + $active.Count))
+    $lines.Add(((Get-AppText 'ActiveDisplaysLabel') + ': ' + $active.Count))
     foreach ($m in $active) {
         $registeredMatches = @(Find-RegisteredConfigForActive $config $m)
-        $registeredText = if ($registeredMatches.Count -eq 1) { 'ja' } else { 'nein' }
+        $registeredText = if ($registeredMatches.Count -eq 1) { Get-AppText 'Yes' } else { Get-AppText 'No' }
         $registeredConfig = if ($registeredMatches.Count -eq 1) { $registeredMatches[0] } else { $null }
 
         $lines.Add('')
@@ -1291,31 +1294,31 @@ function Write-Diagnosis {
         $lines.Add(('Adapter LUID: {0}:{1}' -f $m.AdapterHighPart, $m.AdapterLowPart))
         $lines.Add(('Source Id: ' + $m.SourceId))
         $lines.Add(('Target Id: ' + $m.TargetId))
-        $lines.Add(('Aktuelle Source-Aufloesung: {0} x {1} @ {2} Hz' -f $m.Width, $m.Height, $m.Frequency))
+        $lines.Add(('{0}: {1} x {2} @ {3} Hz' -f (Get-AppText 'CurrentSourceResolutionLabel'), $m.Width, $m.Height, $m.Frequency))
         $lines.Add(('DisplayConfig Source-Mode: {0} x {1}' -f $m.DisplayConfigSourceWidth, $m.DisplayConfigSourceHeight))
         $lines.Add(('Source-Position: {0},{1}' -f $m.SourceX, $m.SourceY))
-        $lines.Add(('Aktuelle Target-Aufloesung: {0} x {1}' -f $m.TargetWidth, $m.TargetHeight))
+        $lines.Add(('{0}: {1} x {2}' -f (Get-AppText 'CurrentTargetResolutionLabel'), $m.TargetWidth, $m.TargetHeight))
         $lines.Add(('Scaling-Modus: {0} ({1})' -f $m.Scaling, (Get-ScalingName $m.Scaling)))
-        $lines.Add(('Registriert: ' + $registeredText))
-        $lines.Add(('Verfuegbare Modi: ' + (Get-ModeSummary $m 30)))
+        $lines.Add(((Get-AppText 'RegisteredLabel') + ': ' + $registeredText))
+        $lines.Add(((Get-AppText 'AvailableModesLabel') + ': ' + (Get-ModeSummary $m 30)))
 
         if ($null -ne $registeredConfig) {
-            $lines.Add(('Erkannte native Aufloesung: {0} x {1}' -f $registeredConfig.NativeWidth, $registeredConfig.NativeHeight))
-            $lines.Add(('Reduzierte Aufloesung: {0} x {1}' -f $registeredConfig.ReducedWidth, $registeredConfig.ReducedHeight))
+            $lines.Add(('{0}: {1} x {2}' -f (Get-AppText 'DetectedNativeResolutionLabel'), $registeredConfig.NativeWidth, $registeredConfig.NativeHeight))
+            $lines.Add(('{0}: {1} x {2}' -f (Get-AppText 'ReducedResolutionLabel'), $registeredConfig.ReducedWidth, $registeredConfig.ReducedHeight))
         }
     }
 
     $lines.Add('')
-    $lines.Add('Gespeicherte Konfiguration:')
+    $lines.Add((Get-AppText 'SavedConfigLabel'))
     if (Test-Path $ConfigPath) {
         $lines.Add((Get-Content $ConfigPath -Raw))
     }
     else {
-        $lines.Add('Keine Konfiguration vorhanden.')
+        $lines.Add((Get-AppText 'NoConfig'))
     }
 
     $lines | Set-Content -Path $DiagPath -Encoding UTF8
-    Show-Info "Diagnose erstellt:`n`n$DiagPath`n`nEs wurden keine Anzeigeeinstellungen veraendert."
+    Show-Info (Get-AppText 'DiagnosisCreated' $DiagPath)
 }
 
 try {
@@ -1338,16 +1341,16 @@ try {
 
     if ($Reset) {
         Reset-Configuration
-        Write-Host 'Konfiguration wurde zurueckgesetzt.'
+        Write-Host (Get-AppText 'ResetDone')
         exit 0
     }
 
     if (-not [string]::IsNullOrWhiteSpace($RemoveDevicePath)) {
         if (Remove-RegisteredMonitorByDevicePath $RemoveDevicePath) {
-            Write-Host 'Monitor wurde entfernt.'
+            Write-Host (Get-AppText 'MonitorRemoved')
             exit 0
         }
-        Write-Host 'Kein passender registrierter Monitor gefunden.'
+        Write-Host (Get-AppText 'NoMatchingRegistered')
         exit 1
     }
 
@@ -1370,6 +1373,6 @@ catch {
         $details | Set-Content -Path $DiagPath -Encoding UTF8
     } catch {}
 
-    Show-ErrorMessage "Das Skript ist unerwartet abgebrochen:`n`n$msg`n`nDetails wurden - soweit moeglich - hier gespeichert:`n$DiagPath"
+    Show-ErrorMessage (Get-AppText 'UnexpectedCrash' $msg, $DiagPath)
     exit 99
 }
